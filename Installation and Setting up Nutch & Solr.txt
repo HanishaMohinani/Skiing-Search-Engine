@@ -1,0 +1,186 @@
+# Web Crawling with Apache Nutch and Apache Solr on Ubuntu (WSL)
+
+This file provides instructions and commands for setting up and running Apache Nutch and Apache Solr for web crawling and indexing on Ubuntu in Windows Subsystem for Linux (WSL).
+
+## Prerequisites
+
+1. A Unix environment. In my case, WSL was used
+2.JDK
+
+## Setup Instructions
+In your Ubuntu terminal run code:
+
+1.After setting up Ubuntu
+2. Install JDK
+
+**Commands**
+- sudo apt-get update
+- sudo apt-get install openjdk-8-jdk
+- Confirm the installation using command-java -version
+
+- Set up {JAVA_HOME} using the following commands:
+
+vim ~/.bashrc
+export JAVA_HOME=$(readlink -f /usr/bin/java | sed "s:bin/java::") 
+export APACHE_SOLR_HOME=/home/ubuntu/solr-7.3.1
+export NUTCH_RUNTIME_HOME=/home/ubuntu/apache-nutch-1.15
+source ~/.bashrc
+
+# Setting up Nutch and solr
+
+### Apache Nutch:
+
+1. **Download and Compile Nutch**:
+   - Download the desired version of Apache Nutch from the Apache Nutch website.
+    Command: wget https://archive.apache.org/dist/nutch/1.15/apache-nutch-1.15-bin.tar.gz
+   - Extract the downloaded package to your preferred location.
+    Command: tar -xvf apache-nutch-1.15-bin.tar.gz
+   - Set up the env variables for {NUTCH_RUNTIME_HOME}
+
+  - Execute the Nutch command-line interface located at ${NUTCH_RUNTIME_HOME}/bin/nutch
+    Command: ${NUTCH_RUNTIME_HOME}/bin/nutch
+
+  - Edit the configuration file for Nutch, typically found at ${NUTCH_RUNTIME_HOME}/conf/nutch-site.xml
+    Command: vi ${NUTCH_RUNTIME_HOME}/conf/nutch-site.xml
+
+
+  <!-- HTTP properties -->
+
+  <!-- Set the user agent name for HTTP requests -->
+  <property>
+    <name>http.agent.name</name>
+    <value>Nutch</value>
+  </property>
+
+  <!-- Plugin properties -->
+
+  <!-- Specify the plugins to include for crawling, parsing, indexing, etc. -->
+  <property>
+    <name>plugin.includes</name>
+    <value>protocol-http|urlfilter-(regex|validator)|parse-(html|tika)|index-(basic|anchor)|indexer-solr|scoring-opic|urlnormalizer-(pass|regex|basic)</value>
+  </property>
+
+2. Create a directory structure to store seed URLs within the Nutch runtime directory
+  Command: mkdir -p ${NUTCH_RUNTIME_HOME}/urls
+
+3. Create an empty file named "seed.txt" within the "urls" directory to store initial seed URLs
+  Command: touch ${NUTCH_RUNTIME_HOME}/urls/seed.txt 
+
+4. Edit the "seed.txt" file to add initial seed URLs for the Nutch crawler
+  Command: vi ${NUTCH_RUNTIME_HOME}/urls/seed.txt
+
+
+### Apache Solr:
+
+1. **Download and Extract Solr**:
+
+   - Download the Solr binary release from the Solr website.
+    Command: wget https://archive.apache.org/dist/lucene/solr/8.11.3/solr-8.11.3.tgz
+
+   - Extract the downloaded file to a directory of your choice.
+    Command: tar -xvf solr-7.3.1.tgz
+
+  - Create a directory structure for Nutch configuration within Solr's configsets directory
+    Command: mkdir -p ${APACHE_SOLR_HOME}/server/solr/configsets/nutch/
+
+  - Copy default Solr configuration files to the newly created Nutch folder
+    Command: cp -r ${APACHE_SOLR_HOME}/server/solr/configsets/_default/* ${APACHE_SOLR_HOME}/server/solr/configsets/nutch/
+
+  - Remove the managed-schema file from the Nutch folder as it will be replaced with a custom schema
+    Command: rm ${APACHE_SOLR_HOME}/server/solr/configsets/nutch/conf/managed-schema
+
+  - Download the schema.xml file from the Apache Nutch GitHub repository
+    Command: wget https://raw.githubusercontent.com/apache/nutch/master/src/plugin/indexer-solr/schema.xml
+
+
+
+# Next Steps:
+
+1. Copy the schema.xml file to the Nutch configuration directory in Solr's configsets
+  Command: cp schema.xml ${APACHE_SOLR_HOME}/server/solr/configsets/nutch/conf/
+
+2. Start the Solr server
+  Command: ${APACHE_SOLR_HOME}/bin/solr start
+
+3.  You can access the Solr web app in your browser at `localhost:8983/solr`.
+
+4. Create a Solr core named "nutch" using the Nutch configuration in the configsets directory
+  Command: ${APACHE_SOLR_HOME}/bin/solr create -c nutch -d ${APACHE_SOLR_HOME}/server/solr/configsets/nutch/conf/
+
+5. Crawl the web using Nutch, specifying Solr server URL, seed URLs directory, and crawl output directory
+  Command: ${NUTCH_RUNTIME_HOME}/bin/crawl -i -D solr.server.url=http://localhost:8983/solr/nutch -s ${NUTCH_RUNTIME_HOME}/urls ${NUTCH_RUNTIME_HOME}/crawl 10
+
+
+6. Inject seed URLs into the crawldb
+ Command:bin/nutch inject crawl/crawldb urls
+
+7. Generate a fetch list and segments based on the crawldb
+ Command:bin/nutch generate crawl/crawldb crawl/segments
+
+8. Get the latest segment directory
+ Command:s1=`ls -d crawl/segments/2* | tail -1`
+
+9. Fetch content for the latest segment
+ Command:bin/nutch fetch $s1
+
+10. Parse fetched content in the latest segment
+ Command:bin/nutch parse $s1
+
+11. Update the crawldb with new links and metadata from the latest segment
+ Command:bin/nutch updatedb crawl/crawldb $s1
+
+12. Invert links in the segments to create linkdb
+ Command:bin/nutch invertlinks crawl/linkdb -dir crawl/segments
+
+13. Index crawled data into Solr, filtering and normalizing URLs, and deleting unavailable URLs
+ Command:bin/nutch index crawl/crawldb/ -linkdb crawl/linkdb -dir crawl/segments/ -filter -normalize -deleteGone
+
+14. Generate webgraph from segments, filter and normalize it, and store it in webgraphdb directory
+ Command:bin/nutch webgraph -filter -normalize -segmentDir crawl/segments/ -webgraphdb crawl/
+
+15. Find loops in the webgraph and store the result in webgraphdb directory
+ Command:bin/nutch loops -webgraphdb crawl/
+
+16. Compute link ranks based on the webgraph and store the result in webgraphdb directory
+ Command:bin/nutch linkrank -webgraphdb crawl/
+
+17. Update scores in the crawldb using the webgraphdb
+ Command:bin/nutch scoreupdater -crawldb crawl/crawldb -webgraphdb crawl/
+
+18. Dump node scores for top 1000 nodes from the webgraphdb
+ Command:bin/nutch nodedumper -scores -topn 1000 -webgraphdb crawl/ -output crawl/dump/scores
+
+19. Display the contents of the scores dump file
+ Command:cat crawl/webgraphdb/dump/scores/part-00000
+
+20. Display statistics of the crawldb
+ Command:bin/nutch readdb crawl/crawldb/ -stats
+
+21. Dump inlinks from the linkdb
+ Command:bin/nutch readlinkdb crawl/linkdb -dump inlinkDb
+
+22. Access Solr web interface to manage indexed data
+ Command:http://ec2-54-88-115-191.compute-1.amazonaws.com:8983/solr/#/
+
+23. Run crawl operation in background using nohup to prevent termination on logout
+ Command:nohup ${NUTCH_RUNTIME_HOME}/bin/crawl -i -D solr.server.url=http://localhost:8983/solr/nutch -s ${NUTCH_RUNTIME_HOME}/urls ${NUTCH_RUNTIME_HOME}/crawl 3 &
+
+24. Define a property for whitelisting robot rules parsing for specific hostnames 
+<property>
+  <name>http.robot.rules.whitelist</name>
+  <value>en.wikipedia.org</value>
+  <description>Comma separated list of hostnames or IP addresses to ignore robot rules parsing for.</description>
+</property>
+
+25.# Use curl command to fetch data from the specified Solr endpoint and save it to solr_data.json
+Command: curl "http://localhost:8983/solr/nutch/select?q=*:*&wt=json&indent=true&rows=2000000000"  > data.json
+
+
+## Additional Notes
+
+- Customize Solr configuration for Nutch by creating a core and configuring schema.xml.
+- Ensure Java is installed as both Nutch and Solr are dependent on it.
+- Pay attention to version compatibility between Nutch and Solr.
+- Adjust configuration files and parameters according to your specific requirements.
+- This guide assumes you are using Ubuntu in Windows Subsystem for Linux (WSL).
+

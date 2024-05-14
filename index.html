@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"  http-equiv="Permissions-Policy" content="interest-cohort=()">
+    <meta name="author" content="Anusha Gupta">
+    <title>Skking Search Engine</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Skiing Search Engine</h1>
+        </header>
+        <div class="search-form">
+            <form id="form">
+                <input type="text" placeholder="Enter query here..." id="UserInput">
+                <div class="options">
+                    <div class="option-group">
+                        <p>Relevance Model Options:</p>
+                        <label for="page_rank"><input type="radio" checked id="page_rank" name="type" value="page_rank"> Page Rank</label>
+                        <label for="hits"><input type="radio" id="hits" name="type" value="hits"> HITS</label>
+                    </div>
+                    <div class="option-group">
+                        <p>Clustering Options:</p>
+                        <label for="flat_clustering"><input type="radio" id="flat_clustering" name="type" value="flat_clustering"> Flat Clustering</label>
+                        <label for="single_hac"><input type="radio" id="single_hac" name="type" value="single_hac"> Single HAC</label>
+                        <label for="average_hac"><input type="radio" id="average_hac" name="type" value="average_hac">Average HAC</label> 
+                    </div>
+                    <div class="option-group">
+                        <p>Query Expansion Option:</p>
+                        <label for="association_qe"><input type="radio" id="association_qe" name="type" value="association_qe"> Association</label>
+                        <label for="metric_qe"><input type="radio" id="metric_qe" name="type" value="metric_qe"> Metric</label>
+                        <label for="scalar_qe"><input type="radio" id="scalar_qe" name="type" value="scalar_qe"> Scalar</label>
+                    </div>
+                </div>
+                <input id="srch" type="button" value="Search" onclick="search(); queryToGoogleBing(); return false;">
+            </form>
+        </div>
+        <div class="search-results">
+            <iframe id="countries" width="100%" height="500"></iframe>
+        </div>
+    </div>
+    <footer>
+        <hr>
+        <h2>Google Search</h2>
+        <iframe id="google" src="https://www.google.com/search?igu=1&source=hp&ei=lheWXriYJ4PktQXN-LPgDA&q=" width="100%" height="500"></iframe>
+        <hr>
+        <h2>Bing Search</h2>
+        <iframe id="bing" src="https://www.bing.com/search?q=" width="100%" height="500"></iframe>
+    </footer>
+    <script src="https://code.jquery.com/jquery-3.5.0.min.js" integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ=" crossorigin="anonymous"></script>
+    <script src="sample_response.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
